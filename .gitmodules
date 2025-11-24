@@ -1,0 +1,4 @@
+[submodule "packages/jackiebrowser-agent"]
+	path = packages/jackiebrowser-agent
+	url = https://github.com/browseros-ai/BrowserOS-agent.git
+	branch = main
