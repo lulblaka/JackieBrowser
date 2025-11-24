@@ -1,0 +1,92 @@
+name: Build JackieBrowser
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type (debug or release)'
+        required: false
+        default: 'release'
+
+env:
+  CHROMIUM_VERSION: '133.0.6943.0'  # Update this to match your target Chromium version
+
+jobs:
+  build-macos:
+    name: Build for macOS
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout JackieBrowser
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install click pyyaml requests
+      
+      - name: Install depot_tools
+        run: |
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+      
+      - name: Fetch Chromium source
+        run: |
+          mkdir -p chromium
+          cd chromium
+          fetch --nohooks chromium
+          cd src
+          git checkout -b build_branch ${{ env.CHROMIUM_VERSION }}
+          gclient sync -D
+      
+      - name: Apply JackieBrowser patches
+        run: |
+          cd $GITHUB_WORKSPACE/packages/jackiebrowser
+          python3 build/build.py \
+            --chromium-src $GITHUB_WORKSPACE/chromium/src \
+            --apply-patches
+      
+      - name: Build JackieBrowser
+        run: |
+          cd $GITHUB_WORKSPACE/packages/jackiebrowser
+          python3 build/build.py \
+            --chromium-src $GITHUB_WORKSPACE/chromium/src \
+            --build \
+            --build-type release \
+            --arch arm64
+      
+      - name: Package DMG
+        run: |
+          cd $GITHUB_WORKSPACE/packages/jackiebrowser
+          python3 build/build.py \
+            --chromium-src $GITHUB_WORKSPACE/chromium/src \
+            --package
+      
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JackieBrowser-macOS-arm64
+          path: ${{ github.workspace }}/chromium/src/out/Default/*.dmg
+          if-no-files-found: error
+      
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ github.workspace }}/chromium/src/out/Default/*.dmg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
