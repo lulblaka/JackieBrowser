@@ -81,12 +81,4 @@ jobs:
           path: ${{ github.workspace }}/chromium/src/out/Default/*.dmg
           if-no-files-found: error
       
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ${{ github.workspace }}/chromium/src/out/Default/*.dmg
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
